@@ -55,7 +55,7 @@
 ;; read-lang : Input-Port -> (U False String)
 (define (read-lang port)
   (define port* (peeking-input-port port))
-  (port-count-lines! port)
+  (port-count-lines! port*)
   (and
    (with-handlers ([exn:fail:read? (λ (e) #false)])
      (not (eq? (read-language port* (λ () read-language-fail)) read-language-fail)))

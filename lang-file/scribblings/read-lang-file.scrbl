@@ -9,6 +9,8 @@
 
 @title{read-lang-file}
 
+source code: @url{https://github.com/AlexKnauth/lang-file}
+
 @defmodule[lang-file/read-lang-file]
 
 @defproc[(read-lang-file [path-string path-string?]) syntax?]{

@@ -9,6 +9,7 @@
          )
 
 (require (only-in racket/list last)
+         (only-in racket/path path-only)
          (only-in racket/port call-with-input-string peeking-input-port)
          (only-in racket/string string-trim)
          (only-in syntax/modread with-module-reading-parameterization)
@@ -20,7 +21,7 @@
 
 ;; read-lang-file : Path-String -> Syntax
 (define (read-lang-file path-string)
-  (call-with-input-file* path-string read-lang-module))
+  (call-with-input-file*/dir path-string read-lang-module))
 
 ;; read-lang-module : Input-Port -> Syntax
 (define (read-lang-module port)
@@ -38,18 +39,18 @@
 (define (lang-file? path-string)
   (cond
     [(file-exists? path-string)
-     (define port (open-input-file path-string))
-     (port-count-lines! port)
-     (begin0
-       (not (read-language-fail? (read-language port (λ () read-language-fail))))
-       (close-input-port port))]
+     (call-with-input-file*/dir
+       path-string
+       (lambda (port)
+         (port-count-lines! port)
+         (not (read-language-fail? (read-language port (λ () read-language-fail))))))]
     [else #false]))
 
 ;; lang-file-lang : Path-String -> (U False String)
 (define (lang-file-lang path-string)
   (cond
     [(file-exists? path-string)
-     (call-with-input-file* path-string read-lang)]
+     (call-with-input-file*/dir path-string read-lang)]
     [else #false]))
 
 ;; read-lang : Input-Port -> (U False String)
@@ -66,6 +67,15 @@
           [start (cdr (last hash-lang-positions))])
      (string-trim (substring str start)))))
 
+;; call-with-input-file*/dir : PathString [InputPort -> Any] #:mode (U 'binary 'text) -> Any
+(define (call-with-input-file*/dir path proc #:mode [mode 'binary])
+  (call-with-input-file*
+    path
+    (lambda (port)
+      (parameterize ([current-directory (or (path-only path) (current-directory))])
+        (proc port)))
+    #:mode mode))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (module+ test
@@ -75,10 +85,13 @@
 
   (define-runtime-path read-lang-file.rkt "read-lang-file.rkt")
   (define-runtime-path interp "test/interp.ss")
+  (define-runtime-path tuvalu.rkt "test/tuvalu.rkt")
 
   (check-true (lang-file? read-lang-file.rkt))
   (check-false (lang-file? interp))
+  (check-true (lang-file? tuvalu.rkt))
   (check-pred syntax? (read-lang-file read-lang-file.rkt))
+  (check-pred syntax? (read-lang-file tuvalu.rkt))
 
   (test-case "read-lang-module"
     (define (read-mod . strs)

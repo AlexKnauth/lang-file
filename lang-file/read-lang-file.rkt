@@ -9,6 +9,7 @@
          )
 
 (require (only-in racket/list last)
+         (only-in racket/path path-only)
          (only-in racket/port call-with-input-string peeking-input-port)
          (only-in racket/string string-trim)
          (only-in syntax/modread with-module-reading-parameterization)
@@ -27,7 +28,8 @@
   (port-count-lines! port)
   (with-module-reading-parameterization 
    (lambda () 
-     (read-syntax (object-name port) port))))
+     (parameterize ((current-directory (or (path-only path-string) (current-directory))))
+       (read-syntax (object-name port) port)))))
 
 ;; private value eq? to itself
 (define read-language-fail (gensym 'read-language-fail))
@@ -75,9 +77,12 @@
   
   (define-runtime-path read-lang-file.rkt "read-lang-file.rkt")
   (define-runtime-path scribblings "scribblings")
+  (define-runtime-path tuvalu.rkt "test/tuvalu.rkt")
+
   (check-true (lang-file? read-lang-file.rkt))
   (check-false (lang-file? scribblings))
   (check-pred syntax? (read-lang-file read-lang-file.rkt))
+  (check-pred syntax? (read-lang-file tuvalu.rkt))
 
   (test-case "read-lang-module"
     (define (read-mod . strs)

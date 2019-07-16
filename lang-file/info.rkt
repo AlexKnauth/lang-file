@@ -2,6 +2,10 @@
 
 (define collection 'multi)
 
+(define implies
+  '("lang-file-lib"
+    ))
+
 (define deps
   '("base"
     "lang-file-lib"

@@ -3,7 +3,8 @@
 (require racket/contract/base)
 (provide (contract-out
           [read-lang-file (-> path-string? syntax?)]
-          [read-lang-module (-> input-port? syntax?)])
+          [read-lang-module (-> input-port? syntax?)]
+          [eval-lang-module (-> input-port? (-> any/c any))])
          lang-file?
          lang-file-lang
          )
@@ -12,12 +13,14 @@
          (only-in racket/path path-only)
          (only-in racket/port call-with-input-string peeking-input-port)
          (only-in racket/string string-trim)
+         (only-in syntax/stx stx-car stx-cdr)
          (only-in syntax/modread with-module-reading-parameterization)
          )
 
 (module+ test
   (require rackunit
-           racket/runtime-path))
+           racket/runtime-path
+           racket/port))
 
 ;; read-lang-file : Path-String -> Syntax
 (define (read-lang-file path-string)
@@ -75,6 +78,36 @@
       (parameterize ([current-directory (or (path-only path) (current-directory))])
         (proc port)))
     #:mode mode))
+
+;; A ModuleDeclInput is one of:
+;;  - ModSyntax   ; evaluated as with eval
+;;  - ModSexpr    ; evaluated as with eval
+;;  - Path        ; names a file holding the input
+;;  - Input-Port  ; used to read the program
+;;  - String      ; holding the complete input
+;;  - Bytes       ; holding the complete input
+;; As used in `make-module-evaluator` from `racket/sandbox`
+;; https://docs.racket-lang.org/reference/Sandboxed_Evaluation.html#(def._((lib._racket%2Fsandbox..rkt)._make-module-evaluator))
+
+;; module-decl-input->syntax : ModuleDeclInput -> Syntax
+(define (module-decl-input->syntax md)
+  (cond
+    [(syntax? md)     md]
+    [(pair? md)       (datum->syntax #f md)]
+    [(path? md)       (read-lang-file md)]
+    [(input-port? md) (read-lang-module md)]
+    [(string? md)     (read-lang-module (open-input-string md))]
+    [(bytes? md)      (read-lang-module (open-input-bytes md))]
+    [else (error 'module-decl-input->syntax "bad module-decl-input: ~v" md)]))
+
+;; eval-lang-module : ModuleDeclInput -> [Any -> Any]
+(define (eval-lang-module module-decl)
+  (define mod-stx (module-decl-input->syntax module-decl))
+  (define mod-name (stx-car (stx-cdr mod-stx)))
+  (define ns (make-base-namespace))
+  (eval mod-stx ns)
+  (eval `(require ',mod-name) ns)
+  (λ (x) (eval x ns)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -172,4 +205,18 @@
                   "#lang     racket\n"
                   ";; has too many spaces\n"))
     )
+
+  (test-case "eval-lang"
+    (define-values (in out) (make-pipe))
+    (define evaluator
+      (parameterize ([current-output-port out])
+        (eval-lang-module
+         (open-input-string
+          (string-append "#lang racket/base\n"
+                         "(provide data)\n"
+                         "(define data 2)\n"
+                         "(println 1)\n")))))
+    (close-output-port out)
+    (check-equal? (port->string in) "1\n")
+    (check-equal? (evaluator 'data) 2))
   )

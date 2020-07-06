@@ -3,12 +3,13 @@
 (require racket/contract/base)
 (provide (contract-out
           [read-lang-file (-> path-string? syntax?)]
-          [read-lang-module (-> input-port? syntax?)])
+          [read-lang-module (-> input-port? syntax?)]
+          [eval-lang-module (-> input-port? (-> any/c any))])
          lang-file?
          lang-file-lang
          )
 
-(require (only-in racket/list last)
+(require (only-in racket/list last second)
          (only-in racket/port call-with-input-string peeking-input-port)
          (only-in racket/string string-trim)
          (only-in syntax/modread with-module-reading-parameterization)
@@ -16,7 +17,8 @@
 
 (module+ test
   (require rackunit
-           racket/runtime-path))
+           racket/runtime-path
+           racket/port))
 
 ;; read-lang-file : Path-String -> Syntax
 (define (read-lang-file path-string)
@@ -28,6 +30,14 @@
   (with-module-reading-parameterization 
    (lambda () 
      (read-syntax (object-name port) port))))
+
+(define (eval-lang-module port)
+  (define mod-stx (read-lang-module port))
+  (define mod-name (second (syntax->list mod-stx)))
+  (define ns (make-base-namespace))
+  (eval mod-stx ns)
+  (eval `(require ',mod-name) ns)
+  (λ (x) (eval x ns)))
 
 ;; private value eq? to itself
 (define read-language-fail (gensym 'read-language-fail))
@@ -158,4 +168,18 @@
                   "#lang     racket\n"
                   ";; has too many spaces\n"))
     )
+
+  (test-case "eval-lang"
+    (define-values (in out) (make-pipe))
+    (define evaluator
+      (parameterize ([current-output-port out])
+        (eval-lang-module
+         (open-input-string
+          (string-append "#lang racket/base\n"
+                         "(provide data)\n"
+                         "(define data 2)\n"
+                         "(println 1)\n")))))
+    (close-output-port out)
+    (check-equal? (port->string in) "1\n")
+    (check-equal? (evaluator 'data) 2))
   )

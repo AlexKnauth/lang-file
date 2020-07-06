@@ -37,3 +37,16 @@ file, false otherwise.
 Returns a string containing the the language of a @hash-lang[] file.
 }
 
+@defproc[(eval-lang-module [port input-port?]) (-> any/c any)]{
+Evaluates the contents of a @hash-lang[] file from @racket[port] and returns
+an evaluator which could be used to query @racket[provide]d identifiers.
+
+@examples[
+  (require lang-file/read-lang-file)
+  (define s (string-append "#lang racket/base\n"
+                           "(provide data)\n"
+                           "(define data 2)\n"
+                           "(println 1)\n"))
+  (define evaluator (eval-lang-module (open-input-string s)))
+  (evaluator '(list data 3))
+]}

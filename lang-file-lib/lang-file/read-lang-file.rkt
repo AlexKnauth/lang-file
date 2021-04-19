@@ -25,8 +25,8 @@
 ;; read-lang-module : Input-Port -> Syntax
 (define (read-lang-module port)
   (port-count-lines! port)
-  (with-module-reading-parameterization 
-   (lambda () 
+  (with-module-reading-parameterization
+   (lambda ()
      (read-syntax (object-name port) port))))
 
 ;; private value eq? to itself
@@ -72,11 +72,12 @@
   (define-check (check-stx-datum stx expected-datum)
     (check-pred syntax? stx)
     (check-equal? (syntax->datum stx) expected-datum))
-  
+
   (define-runtime-path read-lang-file.rkt "read-lang-file.rkt")
-  (define-runtime-path scribblings "scribblings")
+  (define-runtime-path interp "test/interp.ss")
+
   (check-true (lang-file? read-lang-file.rkt))
-  (check-false (lang-file? scribblings))
+  (check-false (lang-file? interp))
   (check-pred syntax? (read-lang-file read-lang-file.rkt))
 
   (test-case "read-lang-module"
@@ -129,7 +130,7 @@
     (check-equal? (read-lang-from-strings
                    "   #lang typed/racket")
                   "typed/racket")
-    
+
     ;; -- confusing #langs
     (check-equal? (read-lang-from-strings
                    "#!racket")

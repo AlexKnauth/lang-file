@@ -1,4 +1,4 @@
-lang-file [![Build Status](https://travis-ci.org/AlexKnauth/lang-file.png?branch=master)](https://travis-ci.org/AlexKnauth/lang-file)
+lang-file
 ===
 Functions for dealing with #lang files
 
